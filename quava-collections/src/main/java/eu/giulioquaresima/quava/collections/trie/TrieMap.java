@@ -15,30 +15,37 @@
 package eu.giulioquaresima.quava.collections.trie;
 
 import java.io.PrintStream;
-import java.util.AbstractMap;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.Spliterator;
 import java.util.Stack;
-import java.util.function.IntUnaryOperator;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
+
+import eu.giulioquaresima.quava.functions.CharUnaryOperator;
 
 /**
  * 
  * 
  * @author Giulio Quaresima (giulio.quaresima--at--gmail.com, giulio.quaresima--at--unipg.it, giulio.quaresima--at--studenti.unicam.it)
  */
-public class TrieMap<V> extends AbstractMap<String, V>
+public class TrieMap<V> implements Map<String, V>
 {
 	@SuppressWarnings("unchecked")
 	private final Node[] EMPTY = new TrieMap.Node[0];
 
-	private final Node root;
+	private Node root;
 	private final CharUnaryOperator charTranslator;
 	int size = 0;
 	
@@ -205,6 +212,125 @@ public class TrieMap<V> extends AbstractMap<String, V>
 	}
 
 	@Override
+	public int size()
+	{
+		return size;
+	}
+	
+	@Override
+	public boolean isEmpty()
+	{
+		return size == 0;
+	}
+	
+	@Override
+	public V remove(Object key)
+	{
+		Node node = getNode(key);
+		if (node != null)
+		{
+			node.removeAsElement();
+			return node.getValue();
+		}
+		return null;
+	}
+	@Override
+	public boolean remove(Object key, Object value)
+	{
+		Node node = getNode(key);
+		if (node != null)
+		{
+			if (Objects.equals(value, node.getValue()))
+			{
+				node.removeAsElement();
+				return true;				
+			}
+		}
+		return false;
+	}
+
+	@Override
+	public void putAll(Map<? extends String, ? extends V> m)
+	{
+		m.forEach(this::put);
+	}
+	
+	@Override
+	public void clear()
+	{
+		root = new Node();
+		size = 0;
+	}
+	
+	@Override
+	public V getOrDefault(Object key, V defaultValue)
+	{
+		Node node = getNode(key);
+		if (node != null)
+		{
+			return Optional.ofNullable(node.getValue()).orElse(defaultValue);
+		}
+		return defaultValue;
+	}
+	
+	@Override
+	public void replaceAll(BiFunction<? super String, ? super V, ? extends V> function)
+	{
+		TrieIterator trieIterator = new TrieIterator();
+		while (trieIterator.hasNext())
+		{
+			Entry<String, V> entry = trieIterator.next();
+			function.apply(entry.getKey(), entry.getValue());
+		}
+	}
+	
+	@Override
+	public boolean replace(String key, V oldValue, V newValue)
+	{
+		Node node = getNode(key);
+		if (node != null)
+		{
+			if (Objects.equals(oldValue, node.getValue()))
+			{
+				node.setValue(newValue);
+				return true;				
+			}
+		}
+		return false;
+	}
+	
+	@Override
+	public V replace(String key, V newValue)
+	{
+		Node node = getNode(key);
+		if (node != null)
+		{
+			V oldValue = node.getValue();
+			node.setValue(newValue);
+			return oldValue;
+		}
+		return null;
+	}
+	
+	@Override
+	public boolean containsValue(Object value)
+	{
+		// TODO Auto-generated method stub
+		return false;
+	}
+	@Override
+	public Set<String> keySet()
+	{
+		// TODO Auto-generated method stub
+		return null;
+	}
+	@Override
+	public Collection<V> values()
+	{
+		// TODO Auto-generated method stub
+		return null;
+	}
+	@Override
 	public Set<Entry<String, V>> entrySet()
 	{
 		Set<Entry<String, V>> entries = new LinkedHashSet<>();
@@ -232,12 +358,11 @@ public class TrieMap<V> extends AbstractMap<String, V>
 		return entries;
 	}
 
-	@Override
-	public int size()
-	{
-		return size;
-	}
-	
+	/**
+	 * @param printStream
+	 * 
+	 * @deprecated For debug purposes only
+	 */
 	public void printTree(PrintStream printStream)
 	{
 		Queue<Node> queue = new LinkedList<>();
@@ -286,6 +411,23 @@ public class TrieMap<V> extends AbstractMap<String, V>
 		private char offset = 0;
 		private String key;
 		private V value;
+
+		private boolean isElement()
+		{
+			return key != null;
+		}
+		
+		private boolean removeAsElement()
+		{
+			if (isElement())
+			{
+				key = null;
+				value = null;
+				size--;
+				return true;
+			}
+			return false;
+		}
 		
 		@Override
 		public String getKey()
@@ -329,72 +471,146 @@ public class TrieMap<V> extends AbstractMap<String, V>
 			return Objects.equals(key, other.key);
 		}
 	}
-	
+		
 	@FunctionalInterface
 	public interface Visitor<V>
 	{
 		void matched(Map.Entry<String, V> entry, int start, int end);
 	}
 	
-	/**
-	 * All copied from {@link IntUnaryOperator}, JavaDocs included.
-	 * 
-	 * @author Giulio Quaresima (giulio.quaresima--at--unipg.it, giulio.quaresima--at--gmail.com)
-	 */
-	public interface CharUnaryOperator
+	class CharArrayComparator implements Comparator<CharSequence>
 	{
-	    /**
-	     * Applies this operator to the given operand.
-	     *
-	     * @param operand the operand
-	     * @return the operator result
-	     */
-	    char applyAsChar(char operand);
+		@Override
+		public int compare(CharSequence o1, CharSequence o2)
+		{
+			if (o1 != null && o2 != null)
+			{
+				int compare = 0;
+				int length = Math.min(o1.length(), o2.length());
+				for (int index = 0; compare == 0 && index < length; index++)
+				{
+					compare = charTranslator.applyAsChar(o1.charAt(index)) - charTranslator.applyAsChar(o2.charAt(index));
+				}
+				return compare;
+			}
+			throw new NullPointerException("TrieMap does not permit null keys, nor do this comparator!");
+		}
+	}
+	
+	class TrieIterator implements Spliterator<Map.Entry<String, V>>, Iterator<Map.Entry<String, V>>
+	{
+		// pre-order traversal
+		Stack<Node> stack = new Stack<>();
+		private Node next = null, savedNext = null;
+		TrieIterator()
+		{
+			stack.push(root);
+		}
+		
+		@Override
+		public boolean hasNext()
+		{
+			while ( this.next == null && ! stack.isEmpty() )
+			{
+				Node current = stack.pop();
+				if (current.isElement())
+				{
+					this.next = current;
+				}
+				for (int index = current.children.length - 1; index >= 0; index--)
+				{
+					Node child = current.children[index];
+					if (child != null)
+					{
+						stack.push(current.children[index]);
+					}
+				}
+			}
 
-	    /**
-	     * Returns a composed operator that first applies the {@code before}
-	     * operator to its input, and then applies this operator to the result.
-	     * If evaluation of either operator throws an exception, it is relayed to
-	     * the caller of the composed operator.
-	     *
-	     * @param before the operator to apply before this operator is applied
-	     * @return a composed operator that first applies the {@code before}
-	     * operator and then applies this operator
-	     * @throws NullPointerException if before is null
-	     *
-	     * @see #andThen(IntUnaryOperator)
-	     */
-	    default CharUnaryOperator compose(CharUnaryOperator before) {
-	        Objects.requireNonNull(before);
-	        return (char v) -> applyAsChar(before.applyAsChar(v));
-	    }
+			return this.next != null;
+		}
 
-	    /**
-	     * Returns a composed operator that first applies this operator to
-	     * its input, and then applies the {@code after} operator to the result.
-	     * If evaluation of either operator throws an exception, it is relayed to
-	     * the caller of the composed operator.
-	     *
-	     * @param after the operator to apply after this operator is applied
-	     * @return a composed operator that first applies this operator and then
-	     * applies the {@code after} operator
-	     * @throws NullPointerException if after is null
-	     *
-	     * @see #compose(CharUnaryOperator)
-	     */
-	    default CharUnaryOperator andThen(CharUnaryOperator after) {
-	        Objects.requireNonNull(after);
-	        return (char t) -> after.applyAsChar(applyAsChar(t));
-	    }
+		@Override
+		public Entry<String, V> next()
+		{
+			if (next != null)
+			{
+				savedNext = next;
+				next = null;
+				return savedNext;
+			}
+			throw new NoSuchElementException("The iteration has no more elements");
+		}
+		
+		@Override
+		public void remove()
+		{
+			if (savedNext != null)
+			{
+				if (savedNext.isElement())
+				{
+					savedNext.removeAsElement();
+					savedNext = null;
+				}
+			}
+			throw new IllegalStateException("The next method has not yet been called, or the remove method has already been called after the last call to the next method");
+		}
 
-	    /**
-	     * Returns a unary operator that always returns its input argument.
-	     *
-	     * @return a unary operator that always returns its input argument
-	     */
-	    static CharUnaryOperator identity() {
-	        return t -> t;
-	    }
+		@Override
+		public boolean tryAdvance(Consumer<? super Entry<String, V>> action)
+		{
+			if (hasNext())
+			{
+				action.accept(next());
+				return true;
+			}
+			return false;
+		}
+
+		@Override
+		public Spliterator<Entry<String, V>> trySplit()
+		{
+			return null;
+		}
+
+		@Override
+		public long estimateSize()
+		{
+			return size();
+		}
+
+		@Override
+		public int characteristics()
+		{
+			return DISTINCT | NONNULL | ORDERED | SORTED | SIZED | SUBSIZED;
+		}
+
+		@Override
+		public void forEachRemaining(Consumer<? super Entry<String, V>> action)
+		{
+			// The default implementation is fine for me
+			Spliterator.super.forEachRemaining(action);
+		}
+
+		@Override
+		public long getExactSizeIfKnown()
+		{
+			return estimateSize();
+		}
+
+		@Override
+		public boolean hasCharacteristics(int characteristics)
+		{
+			// The default implementation is fine for me
+			return Spliterator.super.hasCharacteristics(characteristics);
+		}
+
+		@Override
+		public Comparator<? super Entry<String, V>> getComparator()
+		{
+			// TODO Auto-generated method stub
+			return Spliterator.super.getComparator();
+		}
 
 	}
 }
