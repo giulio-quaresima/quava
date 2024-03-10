@@ -12,7 +12,7 @@
  * the License.
  */
 
-package eu.giulioquaresima.quava.trie;
+package eu.giulioquaresima.quava.collections.trie;
 
 import java.io.IOException;
 import java.nio.file.Files;

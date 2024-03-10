@@ -13,6 +13,6 @@
 		</license>
 	</licenses>
 	<modules>
-		<module>quava-trie</module>
+		<module>quava-collections</module>
 	</modules>
 </project>

@@ -12,7 +12,7 @@
  * the License.
  */
 
-package eu.giulioquaresima.quava.trie;
+package eu.giulioquaresima.quava.collections.trie;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,7 +31,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
-import eu.giulioquaresima.quava.trie.TrieMap.Visitor;
+import eu.giulioquaresima.quava.collections.trie.TrieMap;
+import eu.giulioquaresima.quava.collections.trie.TrieMap.Visitor;
 
 
 public class TestTrieMap
@@ -137,7 +138,7 @@ public class TestTrieMap
 	public void testFindAll()
 	{
 		String text = "It is fundamental and a fundament of this data structure to be greedy. Greetings!";
-		// INDEXES:    01234567890123456789012345678901234567890123456789012345678901234567890123456789012
+		// INDEXES:    012345678901234567890123456789012345678901234567890123456789012345678901234567890
 		// INDEXES:    0         10        20        30        40        50        60        70        80 
 		Map<TrieMap<String>, Integer> mapOfMaps = new IdentityHashMap<>();
 		mapOfMaps.put(new TrieMap<>(), 4);

@@ -12,7 +12,7 @@
  * the License.
  */
 
-package eu.giulioquaresima.quava.trie;
+package eu.giulioquaresima.quava.collections.trie;
 
 import java.io.PrintStream;
 import java.util.AbstractMap;
