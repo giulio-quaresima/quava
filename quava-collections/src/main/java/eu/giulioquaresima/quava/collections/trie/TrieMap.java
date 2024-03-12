@@ -15,6 +15,7 @@
 package eu.giulioquaresima.quava.collections.trie;
 
 import java.io.PrintStream;
+import java.util.AbstractSet;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -51,7 +52,7 @@ public class TrieMap<V> implements Map<String, V>
 	
 	public TrieMap(CharUnaryOperator charTranslator)
 	{
-		this.root = new Node();
+		this.root = new Node(null);
 		this.charTranslator = Optional.ofNullable(charTranslator).orElseGet(CharUnaryOperator::identity);
 	}
 	public TrieMap()
@@ -193,7 +194,7 @@ public class TrieMap<V> implements Map<String, V>
 			
 			if (currentNode.children[index] == null)
 			{
-				currentNode.children[index] = new Node();
+				currentNode.children[index] = new Node(currentNode);
 				increaseSize = true;
 			}
 			currentNode = currentNode.children[index];
@@ -229,7 +230,7 @@ public class TrieMap<V> implements Map<String, V>
 		Node node = getNode(key);
 		if (node != null)
 		{
-			node.removeAsElement();
+			node.remove();
 			return node.getValue();
 		}
 		return null;
@@ -242,7 +243,7 @@ public class TrieMap<V> implements Map<String, V>
 		{
 			if (Objects.equals(value, node.getValue()))
 			{
-				node.removeAsElement();
+				node.remove();
 				return true;				
 			}
 		}
@@ -258,7 +259,7 @@ public class TrieMap<V> implements Map<String, V>
 	@Override
 	public void clear()
 	{
-		root = new Node();
+		root = new Node(null);
 		size = 0;
 	}
 	
@@ -333,29 +334,7 @@ public class TrieMap<V> implements Map<String, V>
 	@Override
 	public Set<Entry<String, V>> entrySet()
 	{
-		Set<Entry<String, V>> entries = new LinkedHashSet<>();
-		
-		// pre-order traversal
-		Stack<Node> stack = new Stack<>();
-		stack.push(root);
-		while ( ! stack.isEmpty() )
-		{
-			Node current = stack.pop();
-			if (current.key != null)
-			{
-				entries.add(current);
-			}
-			for (int index = current.children.length - 1; index >= 0; index--)
-			{
-				Node child = current.children[index];
-				if (child != null)
-				{
-					stack.push(current.children[index]);
-				}
-			}
-		}
-		
-		return entries;
+		return new EntrySet();
 	}
 
 	/**
@@ -407,26 +386,87 @@ public class TrieMap<V> implements Map<String, V>
 
 	class Node implements Entry<String, V>
 	{
+		private final Node parent;
 		private Node[] children = EMPTY;
 		private char offset = 0;
 		private String key;
 		private V value;
+
+		public Node(TrieMap<V>.Node parent)
+		{
+			super();
+			this.parent = parent;
+		}
 
 		private boolean isElement()
 		{
 			return key != null;
 		}
 		
-		private boolean removeAsElement()
+		private void remove()
 		{
 			if (isElement())
 			{
 				key = null;
 				value = null;
 				size--;
-				return true;
 			}
-			return false;
+			if (children == EMPTY)
+			{
+				Node current = this;
+				while (current.parent != null && removeChildAndCountRemaining(current.parent, current) == 0)
+				{
+					current = current.parent;
+				}
+			}
+		}
+		
+		/**
+		 * Search {@code child} through {@code parent.children}, set it to <code>null</code>,
+		 * and return the count of nonnull remaining children.
+		 * 
+		 * @param parent
+		 * @param child
+		 * @return
+		 */
+		private int removeChildAndCountRemaining(Node parent, Node child)
+		{
+			int count = 0, left = -1, right = -1;
+			
+			for (int i = 0; i < parent.children.length; i++)
+			{
+				if (parent.children[i] != null)
+				{
+					if (parent.children[i] == child)
+					{
+						parent.children[i] = null;
+					}
+					else
+					{
+						if (left == -1)
+						{
+							left = i;
+						}
+						right = i;
+						count++;
+					}
+				}
+			}
+			
+			if (count > 0)
+			{
+				int newLength = ( right - left ) + 1 ;
+				Node[] newChildren = newNodes(newLength);
+				System.arraycopy(parent.children, left, newChildren, 0, newLength);
+				parent.children = newChildren;
+			}
+			else
+			{
+				parent.children = EMPTY;
+				parent.offset = 0;
+			}
+			
+			return count;
 		}
 		
 		@Override
@@ -549,7 +589,7 @@ public class TrieMap<V> implements Map<String, V>
 			{
 				if (savedNext.isElement())
 				{
-					savedNext.removeAsElement();
+					savedNext.remove();
 					savedNext = null;
 				}
 			}
@@ -612,5 +652,21 @@ public class TrieMap<V> implements Map<String, V>
 			return Spliterator.super.getComparator();
 		}
 
+	}
+	
+	class EntrySet extends AbstractSet<Entry<String, V>>
+	{
+		@Override
+		public int size()
+		{
+			return TrieMap.this.size();
+		}
+
+		@Override
+		public Iterator<Entry<String, V>> iterator()
+		{
+			return new TrieIterator();
+		}
+		
 	}
 }
