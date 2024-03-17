@@ -15,8 +15,8 @@
 package eu.giulioquaresima.quava.collections.trie;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
-import eu.giulioquaresima.quava.collections.trie.TrieMap;
 import eu.giulioquaresima.quava.collections.trie.TrieMap.Visitor;
 
 

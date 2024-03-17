@@ -15,11 +15,11 @@
 package eu.giulioquaresima.quava.collections.trie;
 
 import java.io.PrintStream;
+import java.util.AbstractCollection;
 import java.util.AbstractSet;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +34,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import eu.giulioquaresima.quava.collections.IteratorUtils;
 import eu.giulioquaresima.quava.functions.CharUnaryOperator;
 
 /**
@@ -316,21 +317,21 @@ public class TrieMap<V> implements Map<String, V>
 	@Override
 	public boolean containsValue(Object value)
 	{
-		// TODO Auto-generated method stub
 		return false;
 	}
+	
 	@Override
 	public Set<String> keySet()
 	{
-		// TODO Auto-generated method stub
-		return null;
+		return new KeySet();
 	}
+	
 	@Override
 	public Collection<V> values()
 	{
-		// TODO Auto-generated method stub
-		return null;
+		return new Values();
 	}
+	
 	@Override
 	public Set<Entry<String, V>> entrySet()
 	{
@@ -411,10 +412,10 @@ public class TrieMap<V> implements Map<String, V>
 				value = null;
 				size--;
 			}
-			if (children == EMPTY)
+			if (children == EMPTY) // If not, there is a valid subtree, so we can stop here 
 			{
 				Node current = this;
-				while (current.parent != null && removeChildAndCountRemaining(current.parent, current) == 0)
+				while (current.parent != null && current.removeAsChildAndAdjustAndCountRemainingSiblings() == 0)
 				{
 					current = current.parent;
 				}
@@ -422,22 +423,24 @@ public class TrieMap<V> implements Map<String, V>
 		}
 		
 		/**
-		 * Search {@code child} through {@code parent.children}, set it to <code>null</code>,
-		 * and return the count of nonnull remaining children.
+		 * Search {@code this} node through siblings, set it to <code>null</code>,
+		 * adjust the remaining siblings' array, setting it to {@link TrieMap#EMPTY}
+		 * if there are no other siblings, and return the count of nonnull remaining siblings.
 		 * 
 		 * @param parent
 		 * @param child
 		 * @return
 		 */
-		private int removeChildAndCountRemaining(Node parent, Node child)
+		private int removeAsChildAndAdjustAndCountRemainingSiblings()
 		{
-			int count = 0, left = -1, right = -1;
+			int count = 0; 
+			char left = (char) -1, right = (char) -1;
 			
-			for (int i = 0; i < parent.children.length; i++)
+			for (char i = 0; i < parent.children.length; i++)
 			{
 				if (parent.children[i] != null)
 				{
-					if (parent.children[i] == child)
+					if (parent.children[i] == this)
 					{
 						parent.children[i] = null;
 					}
@@ -459,6 +462,7 @@ public class TrieMap<V> implements Map<String, V>
 				Node[] newChildren = newNodes(newLength);
 				System.arraycopy(parent.children, left, newChildren, 0, newLength);
 				parent.children = newChildren;
+				parent.offset = left;
 			}
 			else
 			{
@@ -531,6 +535,10 @@ public class TrieMap<V> implements Map<String, V>
 				{
 					compare = charTranslator.applyAsChar(o1.charAt(index)) - charTranslator.applyAsChar(o2.charAt(index));
 				}
+				if (compare == 0)
+				{
+					compare = o1.length() - o2.length();
+				}
 				return compare;
 			}
 			throw new NullPointerException("TrieMap does not permit null keys, nor do this comparator!");
@@ -562,7 +570,7 @@ public class TrieMap<V> implements Map<String, V>
 					Node child = current.children[index];
 					if (child != null)
 					{
-						stack.push(current.children[index]);
+						stack.push(child);
 					}
 				}
 			}
@@ -648,8 +656,7 @@ public class TrieMap<V> implements Map<String, V>
 		@Override
 		public Comparator<? super Entry<String, V>> getComparator()
 		{
-			// TODO Auto-generated method stub
-			return Spliterator.super.getComparator();
+			return Comparator.comparing(Entry::getKey, new CharArrayComparator());
 		}
 
 	}
@@ -667,6 +674,73 @@ public class TrieMap<V> implements Map<String, V>
 		{
 			return new TrieIterator();
 		}
+
+		@Override
+		public boolean remove(Object o)
+		{
+			Node node = TrieMap.this.getNode(o);
+			if (node != null)
+			{
+				node.remove();
+				return true;
+			}
+			return false;
+		}
 		
 	}
+	
+	class KeySet extends AbstractSet<String>
+	{
+		@Override
+		public int size()
+		{
+			return TrieMap.this.size();
+		}
+
+		@Override
+		public Iterator<String> iterator()
+		{
+			return IteratorUtils.map(new TrieIterator(), Entry::getKey);
+		}
+
+		@Override
+		public boolean remove(Object o)
+		{
+			Node node = TrieMap.this.getNode(o);
+			if (node != null)
+			{
+				node.remove();
+				return true;
+			}
+			return false;
+		}	
+	}
+	
+	class Values extends AbstractCollection<V>
+	{
+		@Override
+		public int size()
+		{
+			return TrieMap.this.size();
+		}
+
+		@Override
+		public Iterator<V> iterator()
+		{
+			return IteratorUtils.map(new TrieIterator(), Entry::getValue);
+		}
+
+		@Override
+		public boolean remove(Object o)
+		{
+			Node node = TrieMap.this.getNode(o);
+			if (node != null)
+			{
+				node.remove();
+				return true;
+			}
+			return false;
+		}	
+	}
+	
 }
